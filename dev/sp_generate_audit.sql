@@ -109,23 +109,26 @@ main_block: BEGIN
     SET trg_delete := CONCAT( trg_delete, stmt );
 
     SET insertHeader := CONCAT( 'INSERT IGNORE INTO `', audit_schema_name, '`.audit_meta (audit_id, col_name, old_value, new_value) VALUES \n' );
-    SET trg_insert := CONCAT( trg_insert, '\n', insertHeader );
+    -- SET trg_insert := CONCAT( trg_insert, '\n', insertHeader );
     -- SET trg_update := CONCAT( trg_update, '\n', stmt );
     SET trg_delete := CONCAT( trg_delete, '\n', insertHeader );
 
-    SET stmt := ( SELECT GROUP_CONCAT(' (audit_last_inserted_id, ''', COLUMN_NAME, ''', NULL, ',
+    SET stmt := ( SELECT GROUP_CONCAT('IF ISNULL(NEW.`', COLUMN_NAME, '`) = 0 THEN \n',
+                                      '    ', insertHeader,
+                                      '    (audit_last_inserted_id, ''', COLUMN_NAME, ''', NULL, ',
                         CASE WHEN INSTR( '|binary|varbinary|tinyblob|blob|mediumblob|longblob|', LOWER(DATA_TYPE) ) <> 0 THEN
                             '''[UNSUPPORTED BINARY DATATYPE]'''
                         ELSE
                             CONCAT('NEW.`', COLUMN_NAME, '`')
                         END,
-                        '),'
+                        ');\n',
+                        'END IF;\n'
                     SEPARATOR '\n')
                     FROM information_schema.columns
                         WHERE BINARY TABLE_SCHEMA = BINARY audit_schema_name
                             AND BINARY TABLE_NAME = BINARY audit_table_name );
 
-    SET stmt := CONCAT( TRIM( TRAILING ',' FROM stmt ), ';\n\nEND;' );
+    SET stmt := CONCAT( TRIM( TRAILING ',' FROM stmt ), '\nEND;' );
     SET trg_insert := CONCAT( trg_insert, stmt );
 
 
